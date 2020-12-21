@@ -17,3 +17,6 @@ In the future:
 - up to 4 splits will be allowed.
 - Maximum and minimum win/loss will be recorded. 
 
+Sample Output:
+
+![alt text](https://github.com/JoshuaOStafford/blackjack/blob/main/Sample_Output.png?raw=true)
