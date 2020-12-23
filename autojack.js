@@ -6,7 +6,19 @@ var winLossTotal = 0;
 var win = [0,0,0,0,0,0,0,0,0];
 var attempt = [0,0,0,0,0,0,0,0,0];
 var monitored = false;
+var illustrious = [];
+for (var i = 0; i<19; i++)
+	illustrious.push(true);
 
+// counters for illustrious results
+var insuranceApplied = 0;
+var insuranceWon = 0;
+var insuranceLost = 0;
+var gotHere = 0;
+var splitTenVsFiveApplied = 0;
+var splitTenVsSixApplied = 0;
+
+var nonIllustriousWinnings = [48.867, 49.089, 49.39, 49.7, 49.954, 50.161, 50.496, 50.705, 51.061];
 // need to implement https://wizardofodds.com/games/blackjack/card-counting/high-low/
 
 // Fisher-Yates (aka Knuth) Shuffle from Stack Overflow
@@ -35,16 +47,18 @@ var count = 0;
 var trueCount = 0;
 var hands = 0;
 var walks = 0;
-var shuffledShoot = shuffle(sixDeck);;
+var shuffledShoot = shuffle(sixDeck);
+var betSize = 0;
 
 // *** Driver *** //
-while (hands < 10000000){
+while (hands < 1000000000){
 	suit = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10 ,10 ,10, 11];
 	deck = suit.concat(suit, suit, suit);
 	sixDeck = deck.concat(deck, deck, deck, deck, deck);
 	shuffledShoot = shuffle(sixDeck);
 	//console.log("New Shoot\n\n");
 	while (shuffledShoot.length > (6*52)*(1-deckUsage)) {
+		monitored = false;
 		var decksLeft = Math.round(shuffledShoot.length / 52);
 		if (monitored)
 			console.log(`Decks left: ${decksLeft}`);
@@ -56,7 +70,7 @@ while (hands < 10000000){
 			count = 0;
 			break;
 		}
-		var betSize = determineBetSize(trueCount);
+		betSize = determineBetSize(trueCount);
 		var prevCount = count;
 		userHand = [drawAndCount(), drawAndCount()];
 		dealerHand = [drawAndCount(), drawAndCount()];
@@ -81,17 +95,18 @@ while (hands < 10000000){
 			if (monitored)
 				console.log(`Result: ${result} || Win: ${change} || PayOut: ${change/betSize}\n`);
 		}
+		monitored = false;
 	}
 	
 	count = 0;
 }
 //console.log('Leaving shoot');
 console.log('\n');
-console.log(`Hands: ${hands} || Win/Hand: ${winLossTotal/hands} || Hands/Table: ${Math.floor(hands/(walks+1))}`);
+console.log(`Hands: ${hands} || Win/Hand: ${Math.round(winLossTotal/hands*1000000)/1000000} || Hands/Table: ${Math.floor(hands/(walks+1))}`);
 if (winLossTotal >=0) 
-	console.log(`Average Money Won Per Hour Playing $25 Minimum Tables: $${winLossTotal/hands*84*25}`); // || Total Won: $${winLossTotal*25}
+	console.log(`Average Money Won Per Hour Playing $25 Minimum Tables: $${Math.round(winLossTotal/hands*84*25*100)/100}`); // || Total Won: $${winLossTotal*25}
 if (winLossTotal <0) 
-	console.log(`Average Money Lost Per Hour Playing $25 Minimum Tables: $${-1*winLossTotal/hands*84*25}`); //  || Total Lost: $${-1*winLossTotal*25}
+	console.log(`Average Money Lost Per Hour Playing $25 Minimum Tables: $${Math.round(-1*winLossTotal/hands*84*25*100)/100}`); //  || Total Lost: $${-1*winLossTotal*25}
 function getSum(total, num) {
   return total + Math.round(num); 
 }
@@ -100,9 +115,8 @@ function createOutcome(win, attempt, decimal){
 	return Math.round((win/attempt*100 + Number.EPSILON) * multiplier) / multiplier;
 }
 var totalAttempts = attempt.reduce(getSum, 0);
-console.log(`Percent Winning: `);
-var i;
-for (i = 0; i < attempt.length; i++){
+console.log(`Percent Winning: Weighted Average: ${Math.round((50+winLossTotal/hands*100)*1000)/1000}%`);
+for (var i = 0; i < attempt.length; i++){
 	if (i === 0)
 		console.log(`True Count < ${i}: ${createOutcome(win[i], attempt[i], 3)} || ${createOutcome(attempt[i], totalAttempts, 2)}% of hands`);
 	if (i === attempt.length-1)
@@ -110,6 +124,20 @@ for (i = 0; i < attempt.length; i++){
 	if (i > 0 && i<attempt.length-1)
 		console.log(`True Count ${i-1}-${i}: ${createOutcome(win[i], attempt[i], 3)} || ${createOutcome(attempt[i], totalAttempts, 2)}% of hands`);
 }
+for (var i = 0; i<nonIllustriousWinnings.length; i++){
+	if (i === 0)
+		console.log(`Improvement < ${i}: ${Math.round((createOutcome(win[i], attempt[i], 3) - nonIllustriousWinnings[i])*1000)/1000}`);
+	if (i === attempt.length-1)
+		console.log(`Improvement > ${i-1}: ${Math.round((createOutcome(win[i], attempt[i], 3) - nonIllustriousWinnings[i])*1000)/1000}`);
+	if (i > 0 && i<attempt.length-1)
+		console.log(`Improvement ${i-1}-${i}: ${Math.round((createOutcome(win[i], attempt[i], 3) - nonIllustriousWinnings[i])*1000)/1000}`);
+
+}
+
+// Logging attempts of illustrious 18
+console.log(`Insurance Applied: ${insuranceApplied} || Insurance Won: ${insuranceWon} || Got Here: ${gotHere}`);
+console.log(`Tens Split Vs Five: ${splitTenVsFiveApplied}`);
+console.log(`Tens Split Vs Six: ${splitTenVsSixApplied}`);
 
 // *** Functions *** //
 
@@ -120,6 +148,26 @@ function userAlgorithm(userHand, dealerHand, splitLegal=true){
 	let userCard2 = userHand[1];
 	let dealerCard = dealerHand[0];
 	let hiddenCard = dealerHand[1];
+	if (illustrious[1] && trueCount >=0){
+		var insurance = checkInsurance(userHand, dealerHand);
+		if (insurance !== 'No') {
+			monitored = false;
+			insuranceApplied = insuranceApplied + 1;
+			if (insurance === 'Insurance Won'){
+				insuranceWon = insuranceWon + 1;
+				winLossTotal = updateBankRoll('Insurance Won', betSize);
+			}
+			else {
+				//console.log(`Win Loss Total before: ${winLossTotal}`)
+				winLossTotal = updateBankRoll('Insurance Lost', betSize);
+				//console.log(`Win Loss Total after: ${winLossTotal}`)
+				insuranceLost = insuranceLost + 1;
+			}
+		}
+	}
+	if (illustrious[1] && trueCount >=0){
+		gotHere = gotHere + 1;
+	}
 	var split = false;
 	var blackjack = checkBlackjack(userCard1, userCard2, dealerCard, hiddenCard);
 	if (blackjack !== 'No'){
@@ -215,8 +263,9 @@ function surrender(userCard1, userCard2, dealerCard){
 		return dealerCard === 11;
 	if (userCard1 + userCard2 === 15)
 		return dealerCard === 10;
-	if (userCard1 + userCard2 === 16)
+	if (userCard1 + userCard2 === 16){
 		return (dealerCard === 9 || dealerCard === 10 || dealerCard === 11);
+	}
 	else 
 		return false;
 }
@@ -254,6 +303,14 @@ function checkSplit(userCard, dealerCard){
 	// split 4's if dealer has 5 or 6
 	if (userCard === 4)
 		return (dealerCard === 5 || dealerCard === 6);
+	if (illustrious[4] && trueCount > 5 && userCard === 10){
+		splitTenVsFiveApplied = splitTenVsFiveApplied + 1;
+		return (dealerCard===5);
+	}
+	if (illustrious[5] && trueCount > 4 && userCard === 10){
+		splitTenVsSixApplied = splitTenVsSixApplied + 1;
+		return (dealerCard===6);
+	}
 	return false;
 }
 
@@ -278,6 +335,10 @@ function updateBankRoll(result, betSize){
 		return winLossTotal + betSize;
 	if (result === 'Push')
 		return winLossTotal;
+	if (result === 'Insurance Lost')
+		return winLossTotal - .5*betSize;
+	if (result === 'Insurance Won')
+		return winLossTotal + betSize;
 	if (result === 'Double Win')
 		return winLossTotal + 2*betSize;
 	if (result === 'Double Loss')
@@ -475,11 +536,23 @@ function determineBetSize(trueCount){
 	if (trueCount < 4)
 		return 1;
 	if (trueCount < 5)
-		return 4;
+		return 1;
 	if (trueCount < 6)
-		return 8;
+		return 1;
 	if (trueCount < 7)
-		return 12;
+		return 1;
 	if (trueCount >= 7)
-		return 16;
+		return 1;
+}
+
+function checkInsurance(userHand, dealerHand){
+	if (userHand[0] + userHand[1] === 21)
+		return 'No';
+	if (dealerHand[0] === 11){
+		if (dealerHand[1] === 10)
+			return 'Insurance Won';
+		else 
+			return 'Insurance Lost';
+	} else 
+		return 'No';
 }
